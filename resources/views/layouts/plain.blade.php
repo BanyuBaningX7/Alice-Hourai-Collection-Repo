@@ -5,9 +5,9 @@
     <title>@yield('title', 'Alice Hourai Collection')</title>
 </head>
 <body>
-    <div id="loader"><div class="brand">ALICE HOURAI</div><div class="ring"></div></div>
+    @include('partials.loader')
     @include('partials.flash')
-    @yield('content')
+    <div data-page>@yield('content')</div>
     <script src="{{ asset('js/alice.js') }}"></script>
 </body>
 </html>

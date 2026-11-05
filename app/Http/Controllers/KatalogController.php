@@ -29,7 +29,7 @@ class KatalogController extends Controller
         abort_if($book->status !== 'aktif', 404);
 
         $book->load('category');
-        $related = Book::aktif()->where('category_id', $book->category_id)
+        $related = Book::aktif()->with('category')->where('category_id', $book->category_id)
             ->where('id', '!=', $book->id)->take(3)->get();
 
         return view('katalog.show', compact('book', 'related'));

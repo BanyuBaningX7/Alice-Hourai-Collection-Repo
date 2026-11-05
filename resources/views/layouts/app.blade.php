@@ -6,7 +6,7 @@
     <title>@yield('title', 'Alice Hourai Collection')</title>
 </head>
 <body class="{{ $norail ? '' : 'has-rail' }}">
-    <div id="loader"><div class="brand">ALICE HOURAI</div><div class="ring"></div></div>
+    @include('partials.loader')
 
     @php $items = \App\Support\Menu::items(auth()->user()); @endphp
     <header class="topbar">
@@ -25,7 +25,9 @@
     @unless ($norail) @include('partials.rail') @endunless
     @include('partials.flash')
 
-    <main>@yield('content')</main>
+    <main data-page>@yield('content')</main>
+
+    @include('partials.book-modal')
 
     <footer class="footer">&copy; {{ date('Y') }} Alice Hourai Collection</footer>
     @include('partials.bottom-nav')

@@ -5,7 +5,7 @@
     <title>@yield('title', 'Admin Panel') - Alice Hourai Collection</title>
 </head>
 <body>
-    <div id="loader"><div class="brand">ALICE HOURAI</div><div class="ring"></div></div>
+    @include('partials.loader')
     @include('partials.flash')
     <div class="admin">
         <aside class="admin-side">
@@ -33,7 +33,7 @@
                 <h1>@yield('heading', 'Admin Panel')</h1>
                 <a href="{{ route('profil') }}" class="user-pill"><span class="avatar-sm"><i class="fa-solid fa-user"></i></span>{{ auth()->user()->username }}</a>
             </div>
-            <div class="admin-body">@yield('content')</div>
+            <div class="admin-body" data-page>@yield('content')</div>
         </div>
     </div>
     <script src="{{ asset('js/alice.js') }}"></script>

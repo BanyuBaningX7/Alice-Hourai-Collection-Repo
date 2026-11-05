@@ -43,8 +43,10 @@ class DatabaseSeeder extends Seeder
                 'category_id' => $cat[$category]->id, 'title' => $title, 'author' => $author,
                 'publisher' => 'Penerbit Alice', 'year' => 2024, 'isbn' => $isbn, 'price' => $price,
                 'stock_total' => $stock, 'stock_available' => $stock, 'location' => 'Rak A-' . rand(1, 9),
-                'description' => "{$title} adalah buku contoh karya {$author} untuk keperluan pengujian aplikasi.",
             ]);
         }
+
+        // Deskripsi dan sampul buku contoh (cocok dengan identitas tiap buku)
+        $this->call(BookDetailSeeder::class);
     }
 }
