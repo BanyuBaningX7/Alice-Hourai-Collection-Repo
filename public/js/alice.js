@@ -1,17 +1,15 @@
 /* =====================================================================
    alice.js
-   1) Injeksi style pengaman (agar tahan terhadap cache CSS browser)
-   2) Loading screen pembuka (gaya Endfield):
-      - Muncul saat pertama kali buka web DAN setiap kali di-reload (Ctrl+R / F5)
-      - Intensitas akhir topografi dibatasi 65% (0.65)
-      - Bar loading biru tombol Cari (#4080EC) tanpa glow, angka persen biru + glow
-   3) Loading di dalam area konten saat pindah menu / kirim form
-   4) Toast, dialog konfirmasi, kata sandi
-   5) Pop-up detail buku (terkunci di tengah layar seperti Gambar ke-4, tidak bisa bergeser keluar batas)
-   6) Tombol auto-scroll ke atas di pojok kanan bawah (kotak biru web, panah hitam)
+   1) Injeksi style pengaman (memastikan seluruh perbaikan UI aktif seketika)
+   2) Loading screen pembuka (muncul saat buka web & setiap kali Reload Ctrl+R)
+   3) Animasi Loading Fitur di Tengah Layar (rapi, kapsul kaca tepat di tengah)
+   4) Dropdown Select Kustom (radius border selalu rapi & menyatu saat dibuka)
+   5) Toast, dialog konfirmasi, kata sandi
+   6) Pop-up detail buku (terkunci di tengah layar)
+   7) Tombol auto-scroll ke atas di pojok kanan bawah
    ===================================================================== */
 
-// ---------- 1) Pengaman CSS Runtime (memastikan style baru selalu aktif walau CSS lama ter-cache) ----------
+// ---------- 1) Pengaman CSS Runtime ----------
 (function () {
   if (document.getElementById('alice-runtime-fix')) return;
   const st = document.createElement('style');
@@ -26,47 +24,89 @@
       overscroll-behavior: contain !important; box-sizing: border-box !important;
     }
     .book-dialog .row { justify-content: flex-start !important; margin-top: 0 !important; }
-    #loader {
-      position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important;
-      max-width: none !important; max-height: none !important; border-radius: 0 !important;
-      box-shadow: none !important; transition: none !important;
+    .empty, .card.empty, .empty.card {
+      display: flex !important; flex-direction: column !important; align-items: center !important;
+      justify-content: center !important; text-align: center !important; min-height: 92px !important;
+      padding: 24px 20px !important; gap: 8px !important;
     }
-    #loader .ld-topo { opacity: min(0.65, var(--ld-topo, 0)) !important; }
-    #loader .ld-bar span { background: #4080EC !important; box-shadow: none !important; filter: none !important; }
-    #loader .ld-count i { background: #4080EC !important; box-shadow: 0 0 10px rgba(68,138,255,.65) !important; }
-    #loader .ld-num, #loader .ld-num b, #loader .ld-num em {
-      color: #4080EC !important;
-      text-shadow: 0 0 16px rgba(68,138,255,.8), 0 0 32px rgba(68,138,255,.45) !important;
+    .empty p, .empty h3 { margin: 0 !important; line-height: 1.45 !important; }
+    td.empty { display: table-cell !important; text-align: center !important; padding: 36px 16px !important; vertical-align: middle !important; }
+    input[type="date"] { color-scheme: dark !important; min-height: 48px !important; }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      width: 22px !important; height: 22px !important; padding: 4px !important; margin-left: 8px !important;
+      border-radius: 7px !important; cursor: pointer !important; opacity: 1 !important; filter: none !important;
+      background-color: rgba(68,138,255,.2) !important;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2370A5FF' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E") !important;
+      background-repeat: no-repeat !important; background-position: center !important; background-size: 16px 16px !important;
+      border: 1px solid rgba(68,138,255,.45) !important;
     }
-    #loader.ld-cover, #loader.cover { background: #fff !important; width: 100vw !important; height: 100vh !important; border-radius: 0 !important; }
-    #loader.ld-cover > :not(.ld-wipe), #loader.cover > :not(.ld-wipe) { visibility: hidden !important; }
-    #loader.ld-cover .ld-wipe, #loader.cover .ld-wipe { transform: none !important; animation: none !important; }
-    #loader.ld-fade, #loader.fade { opacity: 0 !important; pointer-events: none !important; transition: opacity 1.1s cubic-bezier(.4,0,.2,1) !important; }
-    button.to-top, #to-top {
-      position: fixed !important; left: auto !important; right: 20px !important; bottom: 22px !important;
-      z-index: 900 !important; width: 44px !important; height: 44px !important;
-      padding: 0 !important; margin: 0 !important; border: 0 !important; border-radius: 2px !important;
-      background: #4080EC !important; color: #000 !important;
-      display: grid !important; place-items: center !important; cursor: pointer !important;
-      box-shadow: 0 0 18px rgba(68,138,255,.45), 0 4px 12px rgba(0,0,0,.5) !important;
-      opacity: 0 !important; visibility: hidden !important; transform: translateY(10px) !important;
-      pointer-events: none !important;
-      transition: opacity .22s ease, transform .22s ease, visibility .22s, background .2s, box-shadow .2s !important;
+    input[type="date"]::-webkit-calendar-picker-indicator:hover {
+      background-color: #4080EC !important;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E") !important;
+      border-color: #448AFF !important; box-shadow: 0 0 12px rgba(68,138,255,.55) !important;
     }
-    body.has-rail button.to-top, body.has-rail #to-top { right: calc(var(--rail, 56px) + 18px) !important; }
-    button.to-top.show, #to-top.show {
-      opacity: 1 !important; visibility: visible !important; transform: translateY(0) !important; pointer-events: auto !important;
+    .c-select { position: relative; display: inline-block; vertical-align: middle; }
+    .field .c-select { display: block; width: 100%; }
+    .c-select-native { position: absolute !important; opacity: 0 !important; pointer-events: none !important; width: 0 !important; height: 0 !important; }
+    .c-select-btn {
+      display: inline-flex; align-items: center; justify-content: space-between; gap: 14px;
+      width: 100%; min-height: 48px; padding: 11px 16px; border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.05);
+      color: #fff; font: inherit; cursor: pointer; backdrop-filter: blur(6px);
+      transition: border-color .2s, box-shadow .2s, border-radius .15s, background .2s; white-space: nowrap;
     }
-    html.modal-lock #to-top { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
-    button.to-top:hover, #to-top:hover {
-      background: #448AFF !important; box-shadow: 0 0 26px rgba(68,138,255,.7), 0 6px 16px rgba(0,0,0,.55) !important;
-      transform: translateY(-2px) !important;
+    .c-select.open .c-select-btn {
+      border-color: #448AFF; box-shadow: 0 0 0 3px rgba(68,138,255,.22);
+      border-bottom-left-radius: 0; border-bottom-right-radius: 0; background: #0D172A;
     }
-    @media (max-width: 820px) {
-      body.has-rail button.to-top, body.has-rail #to-top, button.to-top, #to-top {
-        right: 16px !important; bottom: 78px !important; width: 42px !important; height: 42px !important;
-      }
+    .c-select-btn i { font-size: 12px; color: #9AA4B2; transition: transform .2s ease, color .2s; }
+    .c-select.open .c-select-btn i { transform: rotate(180deg); color: #448AFF; }
+    .c-select-menu {
+      position: absolute; left: 0; right: 0; top: 100%; min-width: 100%; z-index: 260;
+      margin-top: -1px; padding: 6px; background: #0D172A;
+      border: 1px solid #448AFF; border-top: 1px solid rgba(255,255,255,.12);
+      border-radius: 0 0 12px 12px; box-shadow: 0 14px 32px rgba(0,0,0,.65);
+      max-height: 240px; overflow-y: auto;
+      opacity: 0; visibility: hidden; transform: translateY(-4px); pointer-events: none;
+      transition: opacity .16s ease, transform .16s ease, visibility .16s;
     }
+    .c-select.open .c-select-menu { opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto; }
+    .c-select-item {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; padding: 9px 12px; border: 0; border-radius: 8px;
+      background: transparent; color: #dfe6f3; font: inherit; font-size: 15px;
+      text-align: left; cursor: pointer; transition: background .15s, color .15s;
+    }
+    .c-select-item:hover { background: rgba(68,138,255,.18); color: #fff; }
+    .c-select-item.active { background: #4080EC; color: #fff; font-weight: 700; }
+    [data-page].is-loading::before, [data-page].is-loading::after { display: none !important; content: none !important; }
+    #page-loader {
+      position: fixed; inset: 0; z-index: 850; display: grid; place-items: center;
+      pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .18s ease, visibility .18s;
+    }
+    body.has-rail #page-loader { padding-right: var(--rail, 56px); }
+    .admin #page-loader { padding-left: 260px; }
+    @media (max-width: 900px) { .admin #page-loader { padding-left: 0; } }
+    @media (max-width: 820px) { body.has-rail #page-loader { padding-right: 0; padding-bottom: 64px; } }
+    #page-loader.active { opacity: 1; visibility: visible; }
+    #page-loader .pl-bar {
+      position: fixed; left: 0; right: 0; top: 0; height: 3px;
+      background: linear-gradient(90deg, transparent, #4080EC, #70A5FF, transparent) no-repeat;
+      background-size: 38% 100%; animation: pbar .95s linear infinite;
+    }
+    #page-loader .pl-card {
+      display: inline-flex; align-items: center; gap: 14px; padding: 14px 24px; border-radius: 999px;
+      background: rgba(10,18,32,.92); border: 1px solid rgba(68,138,255,.4);
+      backdrop-filter: blur(10px); box-shadow: 0 12px 32px rgba(0,0,0,.65), 0 0 22px rgba(68,138,255,.25);
+    }
+    #page-loader .pl-ring { position: relative; width: 24px; height: 24px; flex: none; }
+    #page-loader .pl-ring::before { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2.5px solid rgba(68,138,255,.22); }
+    #page-loader .pl-ring::after {
+      content: ""; position: absolute; inset: 0; border-radius: 50%;
+      border: 2.5px solid transparent; border-top-color: #4080EC; border-right-color: #70A5FF;
+      animation: spin .7s cubic-bezier(.45,.05,.55,.95) infinite;
+    }
+    #page-loader .pl-text { font: 600 14.5px/1 'Roboto', sans-serif; letter-spacing: .04em; color: #fff; white-space: nowrap; }
   `;
   document.head.appendChild(st);
 })();
@@ -76,11 +116,9 @@
   const el = document.getElementById('loader');
   if (!el) return;
 
-  // Deteksi apakah halaman dimuat ulang (Ctrl+R / F5 / tombol Reload browser)
   const navEntry = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
   const isReload = (navEntry && navEntry.type === 'reload') || (performance.navigation && performance.navigation.type === 1);
 
-  // Bersihkan flag aliceSeen segera setelah halaman terbuka agar Ctrl+R berikutnya selalu menampilkan loading screen
   const skipIntro = !isReload && document.documentElement.classList.contains('no-intro');
   try { sessionStorage.removeItem('aliceSeen'); } catch (e) {}
 
@@ -91,13 +129,13 @@
     return;
   }
 
-  const DURATION = 4000;      // lama hitungan 0 -> 100%
-  const BLINK = 720;          // lama kedap-kedip saat 100% (3 kali)
-  const HOLD = 300;           // jeda sebelum tirai
-  const COVER = 1100;         // waktu tirai biru + putih menutup layar
-  const WHITE_HOLD = 350;     // lama layar putih polos sebelum memudar
-  const FADE = 1100;          // lama putih memudar sampai Beranda terlihat penuh
-  const MAX_TOPO = 0.65;      // intensitas maksimal peta topografi (65%)
+  const DURATION = 4000;
+  const BLINK = 720;
+  const HOLD = 300;
+  const COVER = 1100;
+  const WHITE_HOLD = 350;
+  const FADE = 1100;
+  const MAX_TOPO = 0.65;
 
   const num = el.querySelector('[data-pct]');
   const fill = el.querySelector('[data-fill]');
@@ -114,18 +152,17 @@
 
   function finish() {
     status.textContent = 'Siap';
-    el.classList.add('ld-blink', 'blink');                       // 1) kedap-kedip
+    el.classList.add('ld-blink', 'blink');
     setTimeout(() => {
-      el.classList.add('ld-go', 'go');                           // 2) tirai biru lalu putih menutup
+      el.classList.add('ld-go', 'go');
       setTimeout(() => {
-        el.classList.add('ld-cover');                            // layar putih penuh
+        el.classList.add('ld-cover');
         setTimeout(() => {
-          el.classList.add('ld-fade', 'fade');                   // 3) putih memudar, Beranda terlihat
+          el.classList.add('ld-fade', 'fade');
           setTimeout(remove, FADE + 100);
         }, WHITE_HOLD);
       }, COVER);
     }, BLINK + HOLD);
-    // pengaman: apa pun yang terjadi, loading screen pasti dibersihkan
     setTimeout(remove, BLINK + HOLD + COVER + WHITE_HOLD + FADE + 2500);
   }
 
@@ -139,11 +176,10 @@
     const h = window.innerHeight;
     num.textContent = p;
     fill.style.height = (p >= 100 ? 100 : pct) + '%';
-    // pola topografi: transparan di 0%, lalu timbul perlahan hingga maksimal 65% (0.65)
     const eased = Math.pow(pct / 100, 1.7);
     el.style.setProperty('--ld-topo', (eased * MAX_TOPO).toFixed(3));
     el.style.setProperty('--ld-grid', (eased * 0.22).toFixed(3));
-    count.style.top = Math.min(h - 125, Math.max(30, (pct / 100) * h - 75)) + 'px';   // angka mengikuti ujung bar
+    count.style.top = Math.min(h - 125, Math.max(30, (pct / 100) * h - 75)) + 'px';
     status.textContent = p < 100 ? 'Memuat...' : 'Siap';
 
     if (p >= 100) { finish(); return; }
@@ -152,37 +188,114 @@
   requestAnimationFrame(tick);
 })();
 
-// ---------- 3) Loading di dalam area konten (saat klik menu / kirim form) ----------
+// ---------- 3) Animasi Loading Fitur Tepat di Tengah Layar ----------
 const page = document.querySelector('[data-page]');
+let pageLoader = document.getElementById('page-loader');
+if (!pageLoader) {
+  pageLoader = document.createElement('div');
+  pageLoader.id = 'page-loader';
+  pageLoader.setAttribute('aria-hidden', 'true');
+  pageLoader.innerHTML = '<div class="pl-bar"></div><div class="pl-card"><div class="pl-ring"></div><span class="pl-text">Memuat halaman...</span></div>';
+  document.body.appendChild(pageLoader);
+}
+
 const startLoading = () => {
   try { sessionStorage.setItem('aliceSeen', '1'); } catch (e) {}
   if (page) page.classList.add('is-loading');
+  if (pageLoader) pageLoader.classList.add('active');
+};
+
+const stopLoading = () => {
+  if (page) page.classList.remove('is-loading');
+  if (pageLoader) pageLoader.classList.remove('active');
 };
 
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[href]');
   if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
-  if (a.hasAttribute('data-book') && document.getElementById('book-dialog')) return; // dibuka sebagai pop-up
+  if (a.hasAttribute('data-book') && document.getElementById('book-dialog')) return;
   if (a.target === '_blank' || a.hasAttribute('download')) return;
   const href = a.getAttribute('href');
   if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
   const u = new URL(a.href, location.href);
-  if (u.origin !== location.origin) return;                                   // mailto:, situs lain
+  if (u.origin !== location.origin) return;
   if (u.pathname === location.pathname && u.search === location.search) return;
   startLoading();
 });
 
 document.addEventListener('submit', (e) => {
   const f = e.target;
-  if (e.defaultPrevented) return;                                              // menunggu dialog konfirmasi
+  if (e.defaultPrevented) return;
   if (f.hasAttribute && f.hasAttribute('data-confirm') && !f.dataset.ok) return;
   startLoading();
 });
 
-// Tombol Back browser: pastikan tidak tertinggal dalam keadaan loading
-window.addEventListener('pageshow', () => page && page.classList.remove('is-loading'));
+window.addEventListener('pageshow', stopLoading);
 
-// ---------- 4) Toast hilang otomatis ----------
+// ---------- 4) Custom Rounded Dropdown untuk <select class="select"> ----------
+(function () {
+  document.querySelectorAll('select.select').forEach((sel) => {
+    if (sel.dataset.customized) return;
+    sel.dataset.customized = '1';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'c-select';
+    if (sel.style.width) wrap.style.width = sel.style.width;
+
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+    sel.classList.add('c-select-native');
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'c-select-btn';
+
+    const labelSpan = document.createElement('span');
+    const selectedOpt = sel.options[sel.selectedIndex] || sel.options[0];
+    labelSpan.textContent = selectedOpt ? selectedOpt.textContent : '';
+
+    const icon = document.createElement('i');
+    icon.className = 'fa-solid fa-chevron-down';
+
+    btn.append(labelSpan, icon);
+    wrap.appendChild(btn);
+
+    const menu = document.createElement('div');
+    menu.className = 'c-select-menu';
+
+    Array.from(sel.options).forEach((opt) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'c-select-item' + (opt.selected ? ' active' : '');
+      item.textContent = opt.textContent;
+      item.addEventListener('click', () => {
+        sel.value = opt.value;
+        labelSpan.textContent = opt.textContent;
+        menu.querySelectorAll('.c-select-item').forEach(el => el.classList.remove('active'));
+        item.classList.add('active');
+        wrap.classList.remove('open');
+
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      menu.appendChild(item);
+    });
+
+    wrap.appendChild(menu);
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = wrap.classList.contains('open');
+      document.querySelectorAll('.c-select.open').forEach(w => w.classList.remove('open'));
+      if (!isOpen) wrap.classList.add('open');
+    });
+  });
+
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.c-select.open').forEach(w => w.classList.remove('open'));
+  });
+})();
+
+// ---------- 5) Toast hilang otomatis ----------
 document.querySelectorAll('.toast').forEach(t => setTimeout(() => {
   t.style.transition = 'opacity .4s'; t.style.opacity = 0; setTimeout(() => t.remove(), 400);
 }, 4500));
@@ -218,7 +331,7 @@ if (pw && hint) {
   pw.addEventListener('input', update); role?.addEventListener('change', update); update();
 }
 
-// ---------- 5) Pop-up detail buku (Terkunci di tengah layar seperti Gambar ke-4, halaman belakang tidak bisa di-scroll) ----------
+// ---------- 6) Pop-up detail buku (Terkunci di tengah layar) ----------
 const bd = document.getElementById('book-dialog');
 if (bd) {
   const f = (n) => bd.querySelector('[data-f="' + n + '"]');
@@ -246,7 +359,6 @@ if (bd) {
     f('desc').textContent = b.desc || 'Belum ada deskripsi untuk buku ini.';
     f('url').href = b.url;
 
-    // sampul (otomatis fallback ke sampul huruf jika file gambar gagal dimuat)
     const c = f('cover');
     c.replaceChildren();
     if (b.cover) {
@@ -260,7 +372,6 @@ if (bd) {
       renderFallbackCover(c, b);
     }
 
-    // tombol aksi menyesuaikan pengguna
     const role = bd.dataset.role, suspended = bd.dataset.suspended === '1';
     const cart = JSON.parse(bd.dataset.cart || '[]');
     const show = { login: false, form: false, incart: false, disabled: false, suspended: false, staff: false };
@@ -280,7 +391,6 @@ if (bd) {
     const elForm = byId('bd-form');
     if (elForm) elForm.action = b.cart;
 
-    // Kunci scroll halaman belakang dan pastikan pop-up berada tepat di tengah viewport
     document.documentElement.classList.add('modal-lock');
     bd.setAttribute('inert', '');
     bd.showModal();
@@ -321,13 +431,13 @@ if (bd) {
       window.scrollTo({ top: savedScrollY, behavior: 'instant' });
     }
   });
-  bd.addEventListener('click', (e) => {                       // klik di luar kotak = tutup
+  bd.addEventListener('click', (e) => {
     const r = bd.getBoundingClientRect();
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeBook();
   });
 }
 
-// ---------- 6) Tombol Auto-Scroll ke Atas di Pojok Kanan Bawah ----------
+// ---------- 7) Tombol Auto-Scroll ke Atas di Pojok Kanan Bawah ----------
 (function () {
   let btn = document.getElementById('to-top');
   if (!btn) {
