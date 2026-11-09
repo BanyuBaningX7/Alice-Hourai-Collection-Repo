@@ -15,15 +15,23 @@ class PetugasController extends Controller
 
     public function dashboard()
     {
+        $warnDays = (int) config('library.due_warning_days', 2);
         $stats = [
-            'menunggu' => Loan::where('status', 'menunggu')->count(),
-            'aktif'    => Loan::where('status', 'dipinjam')->count(),
-            'terlambat' => Loan::where('status', 'dipinjam')->whereDate('due_date', '<', today())->count(),
-            'denda'    => LoanDetail::where('denda', '>', 0)->whereNull('denda_lunas_at')->count(),
+            'menunggu'     => Loan::where('status', 'menunggu')->count(),
+            'aktif'        => Loan::where('status', 'dipinjam')->count(),
+            'segera_tempo' => Loan::where('status', 'dipinjam')->whereBetween('due_date', [today(), today()->addDays($warnDays)])->count(),
+            'terlambat'    => Loan::where('status', 'dipinjam')->whereDate('due_date', '<', today())->count(),
+            'denda'        => LoanDetail::where('denda', '>', 0)->whereNull('denda_lunas_at')->count(),
         ];
         $queue = Loan::where('status', 'menunggu')->with('member', 'details.book')->oldest('requested_at')->take(5)->get();
+        $dueAlerts = Loan::where('status', 'dipinjam')
+            ->whereDate('due_date', '<=', today()->addDays($warnDays))
+            ->with('member', 'details.book')
+            ->orderBy('due_date')
+            ->take(8)
+            ->get();
 
-        return view('petugas.dashboard', compact('stats', 'queue'));
+        return view('petugas.dashboard', compact('stats', 'queue', 'dueAlerts'));
     }
 
     // ---------- Pengajuan ----------
@@ -31,7 +39,8 @@ class PetugasController extends Controller
     {
         $loans = Loan::where('status', 'menunggu')->with('member', 'details.book')
             ->when($request->q, fn ($q, $s) => $q->whereHas('member', fn ($m) => $m
-                ->where('username', 'like', "%{$s}%")->orWhere('name', 'like', "%{$s}%")))
+                ->where('username', 'like', "%{$s}%")->orWhere('name', 'like', "%{$s}%")
+                ->orWhere('identity_number', 'like', "%{$s}%")))
             ->oldest('requested_at')->paginate(10)->withQueryString();
 
         return view('petugas.pengajuan', compact('loans'));
@@ -44,15 +53,21 @@ class PetugasController extends Controller
         return view('petugas.pengajuan_show', ['loan' => $loan, 'member' => $loan->member]);
     }
 
-    public function approve(Loan $loan)
+    public function approve(Request $request, Loan $loan)
     {
+        $request->validate([
+            'identity_verified' => 'accepted',
+        ], [
+            'identity_verified.accepted' => 'Wajib mencentang konfirmasi verifikasi KTP/Kartu Identitas anggota sebagai jaminan.',
+        ]);
+
         try {
-            $this->loans->approve($loan, auth()->user());
+            $this->loans->approve($loan, auth()->user(), true);
         } catch (DomainException $e) {
             return back()->with('err', $e->getMessage());
         }
 
-        return redirect()->route('petugas.pengajuan')->with('ok', 'Peminjaman disetujui.');
+        return redirect()->route('petugas.pengajuan')->with('ok', 'Peminjaman disetujui dan jaminan identitas telah diverifikasi.');
     }
 
     public function reject(Request $request, Loan $loan)
@@ -67,15 +82,28 @@ class PetugasController extends Controller
         return redirect()->route('petugas.pengajuan')->with('ok', 'Pengajuan ditolak.');
     }
 
-    // ---------- Pinjaman aktif ----------
+    // ---------- Pinjaman aktif & Pengiriman Peringatan Jatuh Tempo ----------
     public function aktif(Request $request)
     {
         $loans = Loan::where('status', 'dipinjam')->with('member', 'details.book')
             ->when($request->q, fn ($q, $s) => $q->whereHas('member', fn ($m) => $m
-                ->where('username', 'like', "%{$s}%")->orWhere('name', 'like', "%{$s}%")))
+                ->where('username', 'like', "%{$s}%")->orWhere('name', 'like', "%{$s}%")
+                ->orWhere('identity_number', 'like', "%{$s}%")))
             ->orderBy('due_date')->paginate(10)->withQueryString();
 
         return view('petugas.aktif', compact('loans'));
+    }
+
+    public function remind(Request $request, Loan $loan)
+    {
+        $data = $request->validate(['note' => 'nullable|string|max:255']);
+        try {
+            $this->loans->sendDueReminder($loan, auth()->user(), $data['note'] ?? null);
+        } catch (DomainException $e) {
+            return back()->with('err', $e->getMessage());
+        }
+
+        return back()->with('ok', "Notifikasi peringatan jatuh tempo berhasil dikirim ke akun @{$loan->member->username}.");
     }
 
     // ---------- Pengembalian ----------
@@ -84,7 +112,8 @@ class PetugasController extends Controller
         $loans = Loan::where('status', 'dipinjam')->with('member', 'details.book')
             ->when($request->q, fn ($q, $s) => $q->where(fn ($w) => $w
                 ->where('id', $s)
-                ->orWhereHas('member', fn ($m) => $m->where('username', 'like', "%{$s}%")->orWhere('name', 'like', "%{$s}%"))))
+                ->orWhereHas('member', fn ($m) => $m->where('username', 'like', "%{$s}%")->orWhere('name', 'like', "%{$s}%")
+                    ->orWhere('identity_number', 'like', "%{$s}%"))))
             ->orderBy('due_date')->paginate(10)->withQueryString();
 
         return view('petugas.pengembalian', compact('loans'));
@@ -143,7 +172,8 @@ class PetugasController extends Controller
     {
         $members = User::where('role', 'anggota')
             ->when($request->q, fn ($q, $s) => $q->where(fn ($w) => $w
-                ->where('username', 'like', "%{$s}%")->orWhere('name', 'like', "%{$s}%")->orWhere('email', 'like', "%{$s}%")))
+                ->where('username', 'like', "%{$s}%")->orWhere('name', 'like', "%{$s}%")->orWhere('email', 'like', "%{$s}%")
+                ->orWhere('identity_number', 'like', "%{$s}%")))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->withCount('loans')->orderBy('name')->paginate(12)->withQueryString();
 

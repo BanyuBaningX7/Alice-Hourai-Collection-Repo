@@ -18,16 +18,24 @@
     @if ($user->isAdmin())
         <a href="{{ route('admin.dashboard') }}" class="card menu-item"><i class="fa-solid fa-gauge accent"></i> Admin Panel <i class="fa-solid fa-chevron-right chev"></i></a>
     @endif
-    <a href="{{ route('profil.edit') }}" class="card menu-item"><i class="fa-solid fa-pen accent"></i> Edit Profil <i class="fa-solid fa-chevron-right chev"></i></a>
+    <a href="{{ route('profil.edit') }}" class="card menu-item"><i class="fa-solid fa-id-card accent"></i> Edit Profil &amp; Jaminan Identitas <i class="fa-solid fa-chevron-right chev"></i></a>
     <a href="{{ route('profil.password') }}" class="card menu-item"><i class="fa-solid fa-lock accent"></i> Ubah Kata Sandi <i class="fa-solid fa-chevron-right chev"></i></a>
 
     <div class="card mt">
-        <h3>Pengaturan Akun</h3>
+        <h3>Pengaturan Akun &amp; Jaminan Keamanan</h3>
         <dl class="info-grid" style="margin:0">
             <div><dt>Role</dt><dd>{{ ucfirst($user->role) }}</dd></div>
             <div><dt>Status akun</dt><dd>{{ ucfirst($user->status) }}</dd></div>
-            <div><dt>Telepon</dt><dd>{{ $user->phone ?? '-' }}</dd></div>
-            <div><dt>Aturan kata sandi</dt><dd>{{ $user->isAdmin() ? 'Minimal 30 karakter' : 'Tepat 10 karakter' }}</dd></div>
+            <div><dt>Telepon / WA</dt><dd>{{ $user->phone ?? '-' }}</dd></div>
+            <div><dt>Kategori Identitas</dt><dd>{{ $user->identityCategoryLabel() }}</dd></div>
+            <div><dt>Nomor Identitas</dt><dd><b>{{ $user->identity_number ?? 'Belum diisi' }}</b></dd></div>
+            <div><dt>Foto Identitas</dt><dd>
+                @if ($user->identity_card_path)
+                    <a class="accent" href="{{ asset('storage/' . $user->identity_card_path) }}" target="_blank"><i class="fa-solid fa-image"></i> Lihat Foto Kartu Identitas</a>
+                @else
+                    <span class="muted">Belum diunggah</span>
+                @endif
+            </dd></div>
         </dl>
         @if ($user->isAnggota() && $user->isSuspended())
             <div class="alert alert-warn mt"><i class="fa-solid fa-triangle-exclamation"></i> Peminjaman ditangguhkan. Lihat <a class="accent" href="{{ route('member.denda') }}">Tagihan Denda</a>.</div>

@@ -4,9 +4,17 @@
 @section('content')
 <div class="container">
     <div class="page-head">
-        <div><h1>Halo, {{ $user->name }}</h1><span class="muted">Ringkasan peminjaman Anda.</span></div>
+        <div><h1>Halo, {{ $user->name }}</h1><span class="muted">Ringkasan peminjaman & notifikasi jatuh tempo Anda.</span></div>
         <a href="{{ route('katalog.index') }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-book"></i> Cari Buku</a>
     </div>
+
+    @if (! $user->hasIdentityGuarantee())
+        <div class="alert alert-warn">
+            <i class="fa-solid fa-id-card"></i>
+            <div><b>Jaminan Identitas Belum Lengkap.</b> Harap lengkapi nomor KTP / Kartu Identitas di menu
+                <a href="{{ route('profil.edit') }}" class="accent">Edit Profil</a> sebagai syarat keamanan peminjaman buku.</div>
+        </div>
+    @endif
 
     @if ($suspended)
         <div class="alert alert-warn">
@@ -15,6 +23,20 @@
                 <a href="{{ route('member.denda') }}" class="accent">Lihat tagihan</a></div>
         </div>
     @endif
+
+    {{-- Banner Otomatis Deteksi Peringatan Jatuh Tempo (H-2, Hari-H, Terlambat, atau Peringatan Petugas) --}}
+    @foreach ($dueAlerts as $al)
+        <div class="alert {{ $al->isOverdue() ? 'alert-danger' : 'alert-warn' }}" style="margin-bottom:12px">
+            <i class="fa-solid fa-bell"></i>
+            <div>
+                <b>Notifikasi Jatuh Tempo (Transaksi #{{ $al->id }} — {{ $al->dueStatusLabel() }}):</b>
+                Buku <b>{{ $al->details->map(fn ($d) => $d->book->title)->implode(', ') }}</b> memiliki batas kembali pada <b>{{ $al->due_date->format('d M Y') }}</b>.
+                @if ($al->due_notification_note)
+                    <br><span class="small"><i class="fa-solid fa-message"></i> Pesan Petugas ({{ $al->due_notified_at?->format('d/m H:i') }}): "{{ $al->due_notification_note }}"</span>
+                @endif
+            </div>
+        </div>
+    @endforeach
 
     <div class="grid g3">
         <div class="card stat"><div class="num">{{ $activeBooks }}/{{ config('library.max_books') }}</div><div class="lbl">Buku aktif</div></div>
@@ -31,7 +53,10 @@
             <div class="card book">
                 <div class="info">
                     <div class="title">{{ $loan->details->map(fn ($d) => $d->book->title)->implode(', ') }}</div>
-                    <div class="meta">Jatuh tempo {{ $loan->due_date->format('d M Y') }}</div>
+                    <div class="meta">
+                        Jatuh tempo {{ $loan->due_date->format('d M Y') }} &middot;
+                        <b class="{{ $loan->isOverdue() ? 'danger' : ($loan->isDueSoon() ? 'warn' : 'accent') }}">{{ $loan->dueStatusLabel() }}</b>
+                    </div>
                 </div>
                 <x-badge :status="$loan->displayStatus()" />
             </div>
@@ -46,7 +71,7 @@
             <div class="card book">
                 <div class="info">
                     <div class="title">{{ $loan->details->map(fn ($d) => $d->book->title)->implode(', ') }}</div>
-                    <div class="meta">Diajukan {{ $loan->requested_at->format('d M Y H:i') }}</div>
+                    <div class="meta">Diajukan {{ $loan->requested_at->format('d M Y H:i') }} &middot; Jaminan {{ $user->identity_type }}: {{ $user->identity_number }}</div>
                 </div>
                 <x-badge status="menunggu" />
             </div>

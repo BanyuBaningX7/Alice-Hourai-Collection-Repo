@@ -10,14 +10,14 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-// Admin Panel: kelola akun dan role (hanya admin)
 class UserController extends Controller
 {
     public function index(Request $request)
     {
         $users = User::query()
             ->when($request->q, fn ($q, $s) => $q->where(fn ($w) => $w
-                ->where('username', 'like', "%{$s}%")->orWhere('name', 'like', "%{$s}%")->orWhere('email', 'like', "%{$s}%")))
+                ->where('username', 'like', "%{$s}%")->orWhere('name', 'like', "%{$s}%")->orWhere('email', 'like', "%{$s}%")
+                ->orWhere('identity_number', 'like', "%{$s}%")))
             ->when($request->role, fn ($q, $r) => $q->where('role', $r))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->orderBy('name')->paginate(10)->withQueryString();
@@ -27,20 +27,33 @@ class UserController extends Controller
 
     public function create()
     {
-        return view('admin.pengguna.form', ['user' => new User(['role' => 'anggota', 'status' => 'aktif'])]);
+        return view('admin.pengguna.form', ['user' => new User(['role' => 'anggota', 'status' => 'aktif', 'identity_type' => 'KTP'])]);
     }
 
     public function store(Request $request)
     {
+        $idType = (string) $request->input('identity_type', 'KTP');
+        $isMember = $request->input('role') === 'anggota';
+
         $data = $request->validate([
-            'name'     => 'required|string|max:100',
-            'username' => 'required|alpha_dash|max:50|unique:users,username',
-            'email'    => 'required|email|max:150|unique:users,email',
-            'phone'    => 'nullable|string|max:20',
-            'role'     => 'required|in:admin,petugas,anggota',
-            'status'   => 'required|in:aktif,nonaktif',
-            'password' => array_merge(['required', 'confirmed'], User::passwordRules((string) $request->role)),
+            'name'            => 'required|string|max:100',
+            'username'        => 'required|alpha_dash|max:50|unique:users,username',
+            'email'           => 'required|email|max:150|unique:users,email',
+            'phone'           => 'nullable|string|max:20',
+            'identity_type'   => ['required', Rule::in(User::identityTypeKeys())],
+            'identity_number' => User::identityNumberRules($idType, null, $isMember),
+            'identity_card'   => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'role'            => 'required|in:admin,petugas,anggota',
+            'status'          => 'required|in:aktif,nonaktif',
+            'password'        => array_merge(['required', 'confirmed'], User::passwordRules((string) $request->role)),
+        ], [
+            'identity_number.unique' => 'Nomor identitas ini sudah digunakan oleh akun lain.',
         ]);
+
+        if ($request->hasFile('identity_card')) {
+            $data['identity_card_path'] = $request->file('identity_card')->store('identities', 'public');
+        }
+        unset($data['identity_card']);
 
         $user = User::create($data);
         ActivityLog::record('user.created', 'user', $user->id, ['role' => $user->role]);
@@ -55,20 +68,32 @@ class UserController extends Controller
 
     public function update(Request $request, User $pengguna)
     {
+        $idType = (string) $request->input('identity_type', 'KTP');
+        $isMember = $request->input('role') === 'anggota';
+
         $data = $request->validate([
-            'name'     => 'required|string|max:100',
-            'username' => ['required', 'alpha_dash', 'max:50', Rule::unique('users')->ignore($pengguna->id)],
-            'email'    => ['required', 'email', 'max:150', Rule::unique('users')->ignore($pengguna->id)],
-            'phone'    => 'nullable|string|max:20',
-            'role'     => 'required|in:admin,petugas,anggota',
-            'status'   => 'required|in:aktif,nonaktif',
-            'password' => array_merge(['nullable', 'confirmed'], User::passwordRules((string) $request->role)),
+            'name'            => 'required|string|max:100',
+            'username'        => ['required', 'alpha_dash', 'max:50', Rule::unique('users')->ignore($pengguna->id)],
+            'email'           => ['required', 'email', 'max:150', Rule::unique('users')->ignore($pengguna->id)],
+            'phone'           => 'nullable|string|max:20',
+            'identity_type'   => ['required', Rule::in(User::identityTypeKeys())],
+            'identity_number' => User::identityNumberRules($idType, $pengguna->id, $isMember),
+            'identity_card'   => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'role'            => 'required|in:admin,petugas,anggota',
+            'status'          => 'required|in:aktif,nonaktif',
+            'password'        => array_merge(['nullable', 'confirmed'], User::passwordRules((string) $request->role)),
+        ], [
+            'identity_number.unique' => 'Nomor identitas ini sudah digunakan oleh akun lain.',
         ]);
 
-        // Admin tidak boleh menurunkan atau menonaktifkan dirinya sendiri
         if ($pengguna->id === auth()->id() && ($data['role'] !== 'admin' || $data['status'] !== 'aktif')) {
             return back()->withInput()->with('err', 'Anda tidak dapat menurunkan role atau menonaktifkan akun sendiri.');
         }
+
+        if ($request->hasFile('identity_card')) {
+            $data['identity_card_path'] = $request->file('identity_card')->store('identities', 'public');
+        }
+        unset($data['identity_card']);
 
         if (empty($data['password'])) unset($data['password']);
         $pengguna->update($data);
@@ -77,7 +102,6 @@ class UserController extends Controller
         return redirect()->route('admin.pengguna.index')->with('ok', 'Akun diperbarui.');
     }
 
-    // Aktifkan / nonaktifkan akun
     public function status(User $pengguna)
     {
         if ($pengguna->id === auth()->id()) {
@@ -89,7 +113,6 @@ class UserController extends Controller
         return back()->with('ok', 'Status akun diubah menjadi ' . $pengguna->status . '.');
     }
 
-    // Hapus hanya untuk akun tanpa riwayat transaksi
     public function destroy(User $pengguna)
     {
         if ($pengguna->id === auth()->id()) {

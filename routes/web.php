@@ -11,13 +11,6 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Alice Hourai Collection - daftar route
-| Urutan: publik -> akun -> anggota -> petugas -> admin
-|--------------------------------------------------------------------------
-*/
-
 // ---------- Publik ----------
 Route::get('/', [HomeController::class, 'index'])->name('beranda');
 Route::get('/katalog', [KatalogController::class, 'index'])->name('katalog.index');
@@ -62,6 +55,7 @@ Route::middleware(['auth', 'role:petugas'])->prefix('petugas')->name('petugas.')
     Route::post('/pengajuan/{loan}/setujui', [PetugasController::class, 'approve'])->name('approve');
     Route::post('/pengajuan/{loan}/tolak', [PetugasController::class, 'reject'])->name('reject');
     Route::get('/pinjaman', [PetugasController::class, 'aktif'])->name('aktif');
+    Route::post('/pinjaman/{loan}/peringatan', [PetugasController::class, 'remind'])->name('remind');
     Route::get('/pengembalian', [PetugasController::class, 'pengembalian'])->name('pengembalian');
     Route::get('/pengembalian/{loan}', [PetugasController::class, 'pengembalianShow'])->name('pengembalian.show');
     Route::post('/pengembalian/item/{detail}', [PetugasController::class, 'kembali'])->name('kembali');

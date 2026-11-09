@@ -9,6 +9,12 @@
         <div class="alert alert-warn"><i class="fa-solid fa-triangle-exclamation"></i> Akses peminjaman ditangguhkan, pengajuan akan ditolak.</div>
     @endif
 
+    @if (! auth()->user()->hasIdentityGuarantee())
+        <div class="alert alert-danger"><i class="fa-solid fa-id-card"></i>
+            <div><b>Identitas Jaminan Belum Diisi!</b> Anda wajib melengkapi Nomor KTP / Kartu Pelajar di menu <a class="accent" href="{{ route('profil.edit') }}">Edit Profil</a> sebelum mengajukan pinjaman.</div>
+        </div>
+    @endif
+
     <div class="grid" style="grid-template-columns:2fr 1fr;align-items:start">
         <div>
             <h3>Buku dipilih ({{ $books->count() }}/{{ $max - $active }})</h3>
@@ -27,12 +33,16 @@
         </div>
 
         <div class="card">
-            <h3>Ringkasan Pengajuan</h3>
+            <h3>Ringkasan & Jaminan</h3>
             <p class="muted small">Jumlah buku: <b class="accent">{{ $books->count() }}</b><br>
                Buku aktif saat ini: {{ $active }}/{{ $max }}<br>
-               Masa pinjam maksimal {{ config('library.loan_days') }} hari.</p>
+               Masa pinjam maksimal {{ config('library.loan_days') }} hari.<br>
+               Jaminan Identitas: <b>{{ auth()->user()->identity_type ?? 'KTP' }} ({{ auth()->user()->identity_number ?? 'Belum diisi' }})</b></p>
+            <div class="alert alert-info small" style="margin-bottom:12px">
+                <i class="fa-solid fa-shield-halved"></i> Saat mengambil buku di perpustakaan, tunjukkan kartu identitas asli ({{ auth()->user()->identity_type ?? 'KTP' }}) kepada Petugas sebagai jaminan.
+            </div>
             <form method="POST" action="{{ route('ajukan.store') }}">@csrf
-                <button class="btn btn-primary btn-block" {{ $books->isEmpty() ? 'disabled' : '' }}>Kirim Pengajuan</button>
+                <button class="btn btn-primary btn-block" {{ ($books->isEmpty() || !auth()->user()->hasIdentityGuarantee()) ? 'disabled' : '' }}>Kirim Pengajuan</button>
             </form>
         </div>
     </div>

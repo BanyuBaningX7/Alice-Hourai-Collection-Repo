@@ -18,13 +18,17 @@ class MemberController extends Controller
         $active  = (clone $loans)->where('status', 'dipinjam')->with('details.book')->orderBy('due_date')->get();
         $pending = (clone $loans)->where('status', 'menunggu')->with('details.book')->latest()->get();
 
+        // Filter pinjaman aktif yang mendekati jatuh tempo (H-2 s/d Hari-H), sudah terlambat, atau dikirimi pengingat oleh petugas
+        $dueAlerts = $active->filter(fn (Loan $l) => $l->isOverdue() || $l->isDueSoon() || $l->due_notified_at !== null);
+
         return view('member.dashboard', [
-            'user'       => $user,
-            'active'     => $active,
-            'pending'    => $pending,
+            'user'        => $user,
+            'active'      => $active,
+            'pending'     => $pending,
+            'dueAlerts'   => $dueAlerts,
             'activeBooks' => $user->activeBookCount(),
-            'nearestDue' => $active->min('due_date'),
-            'suspended'  => $user->isSuspended(),
+            'nearestDue'  => $active->min('due_date'),
+            'suspended'   => $user->isSuspended(),
         ]);
     }
 
@@ -51,7 +55,6 @@ class MemberController extends Controller
         return back()->with('ok', 'Pengajuan dibatalkan.');
     }
 
-    // Tagihan denda milik anggota
     public function denda()
     {
         $fines = LoanDetail::where('denda', '>', 0)

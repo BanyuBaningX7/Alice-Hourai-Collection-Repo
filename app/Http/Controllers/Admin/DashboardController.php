@@ -21,7 +21,6 @@ class DashboardController extends Controller
             'terlambat' => Loan::where('status', 'dipinjam')->whereDate('due_date', '<', today())->count(),
         ];
 
-        // Peminjaman 6 bulan terakhir (dipakai untuk grafik batang CSS)
         $perMonth = collect(range(5, 0))->map(function ($i) {
             $start = now()->subMonths($i)->startOfMonth();
             return [
@@ -37,11 +36,25 @@ class DashboardController extends Controller
         return view('admin.dashboard', compact('stats', 'perMonth', 'perCategory', 'logs'));
     }
 
-    // Log aktivitas: hanya dibaca
+    // Log aktivitas: mendukung pencarian dengan kata Bahasa Indonesia maupun nama pengguna
     public function log(Request $request)
     {
         $logs = ActivityLog::with('user')
-            ->when($request->q, fn ($q, $s) => $q->where('action', 'like', "%{$s}%"))
+            ->when($request->q, function ($q, $s) {
+                $matchedActions = collect(ActivityLog::ACTION_LABELS)
+                    ->filter(fn ($label) => stripos($label, $s) !== false)
+                    ->keys()
+                    ->all();
+
+                $q->where(function ($w) use ($s, $matchedActions) {
+                    $w->where('action', 'like', "%{$s}%")
+                      ->orWhere('entity_type', 'like', "%{$s}%")
+                      ->orWhereHas('user', fn ($u) => $u->where('username', 'like', "%{$s}%")->orWhere('name', 'like', "%{$s}%"));
+                    if (! empty($matchedActions)) {
+                        $w->orWhereIn('action', $matchedActions);
+                    }
+                });
+            })
             ->when($request->dari, fn ($q, $d) => $q->whereDate('created_at', '>=', $d))
             ->latest('created_at')->paginate(15)->withQueryString();
 

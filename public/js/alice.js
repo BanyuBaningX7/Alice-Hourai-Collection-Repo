@@ -463,3 +463,150 @@ if (bd) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 })();
+
+// ---------- 8) Dropdown Lonceng Notifikasi Jatuh Tempo (Tutup Otomatis Saat Klik di Luar) ----------
+(function () {
+  const wrap = document.querySelector('[data-notif-wrap]');
+  if (!wrap) return;
+  const btn = wrap.querySelector('[data-notif-toggle]');
+  const panel = wrap.querySelector('[data-notif-panel]');
+  if (!btn || !panel) return;
+
+  const closePanel = () => {
+    panel.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  };
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isHidden = panel.hidden;
+    panel.hidden = !isHidden;
+    btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!panel.hidden && !wrap.contains(e.target)) {
+      closePanel();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !panel.hidden) {
+      closePanel();
+    }
+  });
+})();
+
+// ---------- 9) Validasi & Pembatas Format Nomor Identitas (KTP / Kartu Pelajar / KTM / SIM / Paspor) ----------
+(function () {
+  const typeSelect = document.getElementById('identity_type');
+  const numInput = document.getElementById('identity_number');
+  if (!typeSelect || !numInput) return;
+
+  const labelEl = document.querySelector('label[for="identity_number"]');
+  let hintEl = document.getElementById('id-hint');
+  if (!hintEl) {
+    hintEl = document.createElement('div');
+    hintEl.id = 'id-hint';
+    hintEl.className = 'hint';
+    numInput.insertAdjacentElement('afterend', hintEl);
+  }
+
+  const RULES = {
+    'KTP': {
+      label: 'Nomor Induk Kependudukan / NIK KTP (Wajib 16 Digit)',
+      placeholder: 'Contoh: 3275012005080003 (16 digit angka)',
+      max: 16,
+      numericOnly: true,
+      validate: (v) => {
+        if (v.length !== 16) return { ok: false, msg: `Wajib tepat 16 digit angka sesuai KTP. Terisi: ${v.length}/16 digit.` };
+        if (/^(\d)\1{15}$/.test(v) || v === '1234567890123456' || v.startsWith('00')) {
+          return { ok: false, msg: 'Nomor NIK tidak valid (tidak boleh angka urut/kembar asal atau diawali 00).' };
+        }
+        return { ok: true, msg: '✓ Format NIK KTP valid (16/16 digit angka).' };
+      }
+    },
+    'Kartu Pelajar': {
+      label: 'Nomor Induk Siswa Nasional / NISN (Wajib 10 Digit)',
+      placeholder: 'Contoh: 0065432198 (10 digit angka)',
+      max: 10,
+      numericOnly: true,
+      validate: (v) => {
+        if (v.length !== 10) return { ok: false, msg: `Wajib tepat 10 digit angka sesuai NISN Kartu Pelajar. Terisi: ${v.length}/10 digit.` };
+        if (/^(\d)\1{9}$/.test(v) || v === '1234567890') {
+          return { ok: false, msg: 'Nomor NISN tidak valid (tidak boleh angka urut/kembar asal).' };
+        }
+        return { ok: true, msg: '✓ Format NISN Kartu Pelajar valid (10/10 digit angka).' };
+      }
+    },
+    'KTM': {
+      label: 'Nomor Induk Mahasiswa / NIM (8 s/d 15 Karakter)',
+      placeholder: 'Contoh: 2301010042 (8-15 karakter huruf/angka)',
+      max: 15,
+      numericOnly: false,
+      validate: (v) => {
+        if (v.length < 8 || v.length > 15) return { ok: false, msg: `Wajib 8 s/d 15 karakter sesuai NIM Kartu Mahasiswa. Terisi: ${v.length}/15.` };
+        if (/^(.)\1+$/.test(v) || v === '12345678' || v === '1234567890') {
+          return { ok: false, msg: 'Nomor NIM tidak boleh berisi karakter urut/kembar asal.' };
+        }
+        return { ok: true, msg: `✓ Format NIM Kartu Mahasiswa valid (${v.length} karakter).` };
+      }
+    },
+    'SIM': {
+      label: 'Nomor Surat Izin Mengemudi / SIM (12 s/d 16 Digit)',
+      placeholder: 'Contoh: 3275012005080003 (12-16 digit angka)',
+      max: 16,
+      numericOnly: true,
+      validate: (v) => {
+        if (v.length < 12 || v.length > 16) return { ok: false, msg: `Wajib 12 s/d 16 digit angka sesuai kartu SIM. Terisi: ${v.length}/16 digit.` };
+        if (/^(\d)\1+$/.test(v) || v.startsWith('123456789')) {
+          return { ok: false, msg: 'Nomor SIM tidak valid (tidak boleh angka urut/kembar asal).' };
+        }
+        return { ok: true, msg: `✓ Format Nomor SIM valid (${v.length} digit angka).` };
+      }
+    },
+    'Paspor': {
+      label: 'Nomor Paspor (1–2 Huruf Diikuti 7 Digit Angka)',
+      placeholder: 'Contoh: C1234567 atau AB1234567',
+      max: 9,
+      numericOnly: false,
+      validate: (v) => {
+        if (!/^[A-Z]{1,2}\d{7}$/.test(v)) {
+          return { ok: false, msg: `Wajib 1–2 huruf kapital diikuti 7 angka (contoh: C1234567). Terisi: ${v.length}/9.` };
+        }
+        return { ok: true, msg: `✓ Format Nomor Paspor valid (${v}).` };
+      }
+    }
+  };
+
+  const applyRule = () => {
+    const t = typeSelect.value || 'KTP';
+    const rule = RULES[t] || RULES['KTP'];
+    if (labelEl) labelEl.textContent = rule.label;
+    numInput.placeholder = rule.placeholder;
+    numInput.maxLength = rule.max;
+    numInput.inputMode = rule.numericOnly ? 'numeric' : 'text';
+
+    let val = numInput.value;
+    if (rule.numericOnly) {
+      val = val.replace(/\D+/g, '');
+    } else {
+      val = val.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    }
+    if (val.length > rule.max) {
+      val = val.slice(0, rule.max);
+    }
+    if (numInput.value !== val) {
+      numInput.value = val;
+    }
+
+    const res = rule.validate(val);
+    hintEl.textContent = res.msg;
+    hintEl.classList.toggle('is-valid', res.ok);
+    hintEl.classList.toggle('is-invalid', !res.ok && val.length > 0);
+  };
+
+  typeSelect.addEventListener('change', applyRule);
+  numInput.addEventListener('input', applyRule);
+  applyRule();
+})();

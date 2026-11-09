@@ -32,9 +32,12 @@
 <div class="card mt2">
     <div class="row between"><h3 style="margin:0">Aktivitas terbaru</h3><a href="{{ route('admin.log') }}" class="accent small">Lihat semua</a></div>
     @forelse ($logs as $l)
-        <div class="row between" style="padding:8px 0;border-top:1px solid rgba(255,255,255,.08)">
-            <span><b>{{ $l->user->username ?? 'sistem' }}</b> <span class="muted">{{ $l->action }}</span></span>
-            <span class="muted small">{{ $l->created_at?->diffForHumans() }}</span>
+        <div class="row between" style="padding:10px 0;border-top:1px solid rgba(255,255,255,.08)">
+            <span>
+                <b>{{ $l->user->name ?? $l->user->username ?? 'Sistem' }}</b>
+                <span class="muted">— {{ $l->actionLabel() }} ({{ $l->targetLabel() }})</span>
+            </span>
+            <span class="muted small">{{ $l->created_at?->locale('id')->diffForHumans() }}</span>
         </div>
     @empty <p class="muted">Belum ada aktivitas.</p> @endforelse
 </div>

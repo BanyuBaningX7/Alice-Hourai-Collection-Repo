@@ -24,6 +24,7 @@ class LoanService
 
         if (empty($bookIds))                      throw new DomainException('Pilih minimal satu buku.');
         if ($member->status !== 'aktif')          throw new DomainException('Akun Anda tidak aktif.');
+        if (! $member->hasIdentityGuarantee())    throw new DomainException('Keamanan Peminjaman: Lengkapi Nomor Identitas (KTP/Kartu Pelajar/SIM) di menu Edit Profil terlebih dahulu sebagai jaminan.');
         if ($member->isSuspended())               throw new DomainException('Akses peminjaman ditangguhkan. Kembalikan buku yang terlambat atau lunasi denda.');
         if ($member->activeBookCount() + count($bookIds) > $max) {
             throw new DomainException("Maksimal {$max} buku aktif (diajukan atau dipinjam).");
@@ -40,7 +41,10 @@ class LoanService
             foreach ($books as $book) {
                 $loan->details()->create(['book_id' => $book->id]);
             }
-            ActivityLog::record('loan.requested', 'loan', $loan->id);
+            ActivityLog::record('loan.requested', 'loan', $loan->id, [
+                'identity_type'   => $member->identity_type,
+                'identity_number' => $member->identity_number,
+            ]);
             return $loan;
         });
     }
@@ -55,9 +59,13 @@ class LoanService
         ActivityLog::record('loan.cancelled', 'loan', $loan->id);
     }
 
-    // Petugas menyetujui: cek stok ulang, ubah status, kurangi stok (satu transaksi database)
-    public function approve(Loan $loan, User $petugas): void
+    // Petugas menyetujui: wajib verifikasi KTP/ID jaminan, cek stok ulang, ubah status, kurangi stok
+    public function approve(Loan $loan, User $petugas, bool $identityVerified = true): void
     {
+        if (! $identityVerified) {
+            throw new DomainException('Wajib mencentang verifikasi KTP/Kartu Identitas asli anggota sebagai jaminan.');
+        }
+
         DB::transaction(function () use ($loan, $petugas) {
             $loan = Loan::whereKey($loan->id)->lockForUpdate()->first();
             if ($loan->status !== 'menunggu') throw new DomainException('Pengajuan sudah diproses.');
@@ -71,14 +79,37 @@ class LoanService
             }
 
             $loan->update([
-                'status'       => 'dipinjam',
-                'approved_at'  => now(),
-                'loan_date'    => today(),
-                'due_date'     => today()->addDays(config('library.loan_days')),
-                'processed_by' => $petugas->id,
+                'status'            => 'dipinjam',
+                'identity_verified' => true,
+                'approved_at'       => now(),
+                'loan_date'         => today(),
+                'due_date'          => today()->addDays(config('library.loan_days')),
+                'processed_by'      => $petugas->id,
             ]);
-            ActivityLog::record('loan.approved', 'loan', $loan->id);
+            ActivityLog::record('loan.approved', 'loan', $loan->id, ['identity_verified' => true]);
         });
+    }
+
+    // Petugas mengirim notifikasi peringatan jatuh tempo ke anggota
+    public function sendDueReminder(Loan $loan, User $petugas, ?string $note = null): void
+    {
+        if ($loan->status !== 'dipinjam') {
+            throw new DomainException('Peringatan jatuh tempo hanya untuk transaksi yang sedang dipinjam.');
+        }
+
+        $defaultNote = $loan->isOverdue()
+            ? 'Peringatan Keterlambatan: Masa pinjam buku Anda telah melewati jatuh tempo. Mohon segera dikembalikan ke perpustakaan.'
+            : 'Pengingat Jatuh Tempo: Masa pinjam buku Anda segera berakhir pada ' . $loan->due_date->format('d/m/Y') . '. Mohon kembalikan tepat waktu.';
+
+        $loan->update([
+            'due_notified_at'       => now(),
+            'due_notification_note' => $note ?: $defaultNote,
+        ]);
+
+        ActivityLog::record('loan.due_reminded', 'loan', $loan->id, [
+            'member_id' => $loan->member_id,
+            'petugas'   => $petugas->username,
+        ]);
     }
 
     // Petugas menolak dengan alasan
